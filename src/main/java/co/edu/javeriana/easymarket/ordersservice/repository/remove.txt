@@ -1,1 +1,0 @@
-Autogenerate repositories with JPA Buddy plugin for IntelliJ IDEA

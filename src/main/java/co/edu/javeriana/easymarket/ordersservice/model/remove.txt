@@ -1,1 +1,0 @@
-Autogenerate model with JPA Buddy plugin for IntelliJ IDEA
