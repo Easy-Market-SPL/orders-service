@@ -13,7 +13,6 @@ import java.util.Objects;
 @Setter
 @Embeddable
 public class OrderProductId implements Serializable {
-    private static final long serialVersionUID = 1063722868607778360L;
     @Column(name = "id_order", nullable = false)
     private Integer idOrder;
 

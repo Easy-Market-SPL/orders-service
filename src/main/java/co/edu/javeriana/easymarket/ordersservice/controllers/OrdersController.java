@@ -8,7 +8,6 @@ import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderUpdateDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.utils.ConfirmOrderDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.utils.OnWayCompanyDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.utils.OnWayDeliveryDTO;
-import co.edu.javeriana.easymarket.ordersservice.model.Order;
 import co.edu.javeriana.easymarket.ordersservice.services.OrderService;
 import co.edu.javeriana.easymarket.ordersservice.utils.OperationException;
 import org.springframework.beans.factory.annotation.Autowired;
