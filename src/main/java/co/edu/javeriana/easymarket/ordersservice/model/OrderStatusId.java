@@ -2,7 +2,6 @@ package co.edu.javeriana.easymarket.ordersservice.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -14,15 +13,13 @@ import java.util.Objects;
 @Getter
 @Setter
 @Embeddable
-@AllArgsConstructor
 @NoArgsConstructor
 public class OrderStatusId implements Serializable {
-    private static final long serialVersionUID = -6319354646823817466L;
-    @Column(name = "id_order", nullable = false)
-    private Integer idOrder;
-
     @Column(name = "status", nullable = false, length = 45)
     private String status;
+
+    @Column(name = "id_order", nullable = false)
+    private Integer idOrder;
 
     @Override
     public boolean equals(Object o) {
@@ -36,6 +33,12 @@ public class OrderStatusId implements Serializable {
     @Override
     public int hashCode() {
         return Objects.hash(idOrder, status);
+    }
+
+    // Constructor
+    public OrderStatusId(String status, Integer idOrder) {
+        this.status = status;
+        this.idOrder = idOrder;
     }
 
 }

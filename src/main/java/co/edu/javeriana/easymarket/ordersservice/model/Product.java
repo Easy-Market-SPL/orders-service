@@ -1,9 +1,6 @@
 package co.edu.javeriana.easymarket.ordersservice.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,6 +10,7 @@ import lombok.Setter;
 @Table(name = "product")
 public class Product {
     @Id
+    @SequenceGenerator(name = "product_id_gen", sequenceName = "order_id_order_seq", allocationSize = 1)
     @Column(name = "code", nullable = false, length = 200)
     private String code;
 

@@ -1,7 +1,6 @@
 package co.edu.javeriana.easymarket.ordersservice.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -11,10 +10,10 @@ import java.time.Instant;
 @Getter
 @Setter
 @Entity
-@AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "order_status")
 public class OrderStatus {
+    @SequenceGenerator(name = "order_status_id_gen", sequenceName = "order_id_order_seq", allocationSize = 1)
     @EmbeddedId
     private OrderStatusId id;
 
@@ -32,8 +31,14 @@ public class OrderStatus {
     @Column(name = "notes", length = 200)
     private String notes;
 
-    public OrderStatus(OrderStatusId orderStatusId) {
-        this.id = orderStatusId;
+    // Constructor
+    public OrderStatus(OrderStatusId id, Order order) {
+        this.id = id;
+        this.idOrder = order;
         this.startDate = Instant.now();
+
+        // TODO: Correct this, the end date of the status should be set when the status changes
+        this.endDate = Instant.now();
     }
+
 }

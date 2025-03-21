@@ -38,6 +38,8 @@ public class OrderDTO implements Serializable {
         this.transportCompany = order.getTransportCompany();
         this.shippingGuide = order.getShippingGuide();
         this.idDomiciliary = order.getIdDomiciliary();
+        this.products = new HashMap<>();
+        this.status = new HashMap<>();
 
         // Create hashmap for order products
         for (OrderProduct orderProduct : order.getOrderProducts()) {

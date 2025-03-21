@@ -2,6 +2,7 @@ package co.edu.javeriana.easymarket.ordersservice.services;
 
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderCreateDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderDTO;
+import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderUpdateDTO;
 import co.edu.javeriana.easymarket.ordersservice.model.*;
 import co.edu.javeriana.easymarket.ordersservice.repository.OrderProductRepository;
 import co.edu.javeriana.easymarket.ordersservice.repository.OrderRepository;
@@ -11,6 +12,7 @@ import co.edu.javeriana.easymarket.ordersservice.utils.OperationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -49,7 +51,6 @@ public class OrderService {
     ///  Get a specific order by id
     public OrderDTO getOrderById(int id) throws OperationException {
         Order order = orderRepository.findById(id).orElse(null);
-
         if (order == null) throw new OperationException(404, "Order not found");
 
         return new OrderDTO(order);
@@ -58,13 +59,27 @@ public class OrderService {
     ///  Create an order
     public OrderDTO createOrder(OrderCreateDTO orderDTO) throws OperationException {
         Order order = new Order(orderDTO);
+        // Save order in the database
+        try {
+            return new OrderDTO(orderRepository.save(order));
+        }
+        catch (Exception e){
+            throw new OperationException(500, "Error creating order".concat(e.getMessage()));
+        }
+    }
+
+    ///  Update an order
+    public OrderDTO updateOrder(int id, OrderUpdateDTO orderDTO) throws OperationException {
+        Order order = orderRepository.findById(id).orElse(null);
+        if (order == null) throw new OperationException(404, "Order not found");
+        order.setAddress(orderDTO.address());
 
         // Save order in the database
         try {
             return new OrderDTO(orderRepository.save(order));
         }
         catch (Exception e){
-            throw new OperationException(500, "Error creating order");
+            throw new OperationException(500, "Error updating order ".concat(e.getMessage()));
         }
     }
 
@@ -76,24 +91,23 @@ public class OrderService {
         if (order == null) throw new OperationException(404, "Order not found");
 
         // Add confirmed status to the order and set shipping cost
-        try{
-            OrderStatus orderStatus = new OrderStatus(new OrderStatusId(order.getId(), "confirmed"));
+        try {
+            OrderStatusId orderStatusId = new OrderStatusId("confirmed", order.getId());
+            OrderStatus orderStatus = new OrderStatus(orderStatusId, order);
             order.getOrderStatuses().add(orderStatus);
 
+            orderStatusRepository.save(orderStatus);
+
             order.setShippingCost(shippingCost);
-            order.setTotal(order.getTotal() + shippingCost);
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Wrong status");
-        }
-        // Save order in the database
-        try {
+            float total = (order.getTotal() + shippingCost);
+            order.setTotal(total);
+
             return new OrderDTO(orderRepository.save(order));
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Error creating order");
+        } catch (Exception e) {
+            throw new OperationException(500, "Error updating status to Confirmed ".concat(e.getMessage()));
         }
     }
+
     /// Prepare order
     public OrderDTO prepareOrder(int id) throws OperationException {
         Order order = orderRepository.findById(id).orElse(null);
@@ -103,8 +117,9 @@ public class OrderService {
         // Add prepared status to the order and set end date of the previous status
         try{
             // Add prepared status to the order and set end date of the previous status
-            OrderStatus orderStatus = new OrderStatus(new OrderStatusId(order.getId(), "preparing"));
+            OrderStatus orderStatus = new OrderStatus(new OrderStatusId("preparing", order.getId()), order);
             order.getOrderStatuses().add(orderStatus);
+            orderStatusRepository.save(orderStatus);
 
             order.getOrderStatuses().stream()
                     .filter(previosOrderStatus -> previosOrderStatus.getId().getStatus().equals("confirmed"))
@@ -120,7 +135,7 @@ public class OrderService {
             return new OrderDTO(orderRepository.save(order));
         }
         catch (Exception e){
-            throw new OperationException(500, "Error creating order");
+            throw new OperationException(500, "Error updating status to preparing ".concat(e.getMessage()));
         }
     }
     ///  On the way as domiciliary
@@ -131,14 +146,7 @@ public class OrderService {
 
         // Add delivered status to the order and set domiciliary and shipping guide
         try{
-            OrderStatus orderStatus = new OrderStatus(new OrderStatusId(order.getId(), "on the way"));
-            order.getOrderStatuses().add(orderStatus);
-
-            order.getOrderStatuses().stream()
-                    .filter(previosOrderStatus -> previosOrderStatus.getId().getStatus().equals("preparing"))
-                    .findFirst()
-                    .ifPresent(previosOrderStatus -> previosOrderStatus.setEndDate(orderStatus.getStartDate()));
-
+            orderStatusOnTheWay(order);
             order.setIdDomiciliary(idDomiciliary);
         }
         catch (Exception e){
@@ -150,7 +158,7 @@ public class OrderService {
             return new OrderDTO(orderRepository.save(order));
         }
         catch (Exception e){
-            throw new OperationException(500, "Error creating order");
+            throw new OperationException(500, "Error updating status to On The Way ".concat(e.getMessage()));
         }
     }
     ///  On the way as transport company
@@ -161,13 +169,7 @@ public class OrderService {
 
         // Add delivered status to the order and set transport company and shipping guide
         try{
-            OrderStatus orderStatus = new OrderStatus(new OrderStatusId(order.getId(), "on the way"));
-            order.getOrderStatuses().add(orderStatus);
-
-            order.getOrderStatuses().stream()
-                    .filter(previosOrderStatus -> previosOrderStatus.getId().getStatus().equals("preparing"))
-                    .findFirst()
-                    .ifPresent(previosOrderStatus -> previosOrderStatus.setEndDate(orderStatus.getStartDate()));
+            orderStatusOnTheWay(order);
 
             order.setTransportCompany(transportCompany);
             order.setShippingGuide(shippingGuide);
@@ -181,9 +183,23 @@ public class OrderService {
             return new OrderDTO(orderRepository.save(order));
         }
         catch (Exception e){
-            throw new OperationException(500, "Error creating order");
+            throw new OperationException(500, "Error updating status to On The Way".concat(e.getMessage()));
         }
     }
+
+    ///  Aux Method for avoid duplicated code for the OnTheWay status
+    private void orderStatusOnTheWay(Order order) {
+        OrderStatus orderStatus = new OrderStatus(new OrderStatusId("on the way", order.getId()), order);
+        order.getOrderStatuses().add(orderStatus);
+
+        orderStatusRepository.save(orderStatus);
+
+        order.getOrderStatuses().stream()
+                .filter(previosOrderStatus -> previosOrderStatus.getId().getStatus().equals("preparing"))
+                .findFirst()
+                .ifPresent(previosOrderStatus -> previosOrderStatus.setEndDate(orderStatus.getStartDate()));
+    }
+
     /// Delivered order
     public OrderDTO deliveredOrder(int id) throws OperationException {
         Order order = orderRepository.findById(id).orElse(null);
@@ -192,8 +208,10 @@ public class OrderService {
 
         // Add delivered status to the order
         try{
-            OrderStatus orderStatus = new OrderStatus(new OrderStatusId(order.getId(), "delivered"));
+            OrderStatus orderStatus =  new OrderStatus(new OrderStatusId("delivered", order.getId()), order);
             order.getOrderStatuses().add(orderStatus);
+
+            orderStatusRepository.save(orderStatus);
 
             order.getOrderStatuses().stream()
                     .filter(previosOrderStatus -> previosOrderStatus.getId().getStatus().equals("on the way"))
@@ -208,7 +226,7 @@ public class OrderService {
             return new OrderDTO(orderRepository.save(order));
         }
         catch (Exception e){
-            throw new OperationException(500, "Error creating order");
+            throw new OperationException(500, "Error updating status to delivered ".concat(e.getMessage()));
         }
     }
 
@@ -224,53 +242,48 @@ public class OrderService {
 
             orderRepository.delete(order);
         } catch (Exception e) {
-            throw new OperationException(500, "Error deleting order");
+            throw new OperationException(500, "Error deleting order ".concat(e.getMessage()));
         }
     }
 
     ///  Methods to update the products of an order
     /// Add Product to Order
     public OrderDTO addProductToOrder(int id, String productCode, int quantity) throws OperationException {
-        // Find order and product by respective id
         Order order = orderRepository.findById(id).orElse(null);
         Product product = productRepository.findById(productCode).orElse(null);
 
         if (order == null) throw new OperationException(404, "Order not found");
         if (product == null) throw new OperationException(404, "Product not found");
 
+        if (order.getOrderProducts() == null) {
+            order.setOrderProducts(new LinkedHashSet<>());
+        }
+
         try {
-            // Check if an OrderProduct with the same product code already exists
             OrderProduct orderProduct = order.getOrderProducts().stream()
                     .filter(op -> op.getId().getProductCode().equals(productCode))
                     .findFirst()
                     .orElse(null);
 
             if (orderProduct != null) {
-                // If it exists, update the quantity and price
-                orderProduct.setQuantity(orderProduct.getQuantity() + quantity);
+                orderProduct.setQuantity(quantity);
                 orderProduct.setPrice(product.getPrice() * orderProduct.getQuantity());
-                // Save updated OrderProduct
                 orderProductRepository.save(orderProduct);
             } else {
-                // If it doesn't exist, create a new OrderProduct
                 orderProduct = new OrderProduct(order, product, quantity);
                 order.getOrderProducts().add(orderProduct);
-                // Save the new OrderProduct
                 orderProductRepository.save(orderProduct);
             }
 
-            // Update the total of the order after adding or updating the product
             order.calculateTotal();
-
-            // Save the updated order with the new total
             orderRepository.save(order);
 
-            // Return the updated OrderDTO
             return new OrderDTO(order);
         } catch (Exception e) {
-            throw new OperationException(500, "Error adding product to order");
+            throw new OperationException(500, "Error adding product to order ".concat(e.getMessage()));
         }
     }
+
 
     ///  Delete product from order
     public OrderDTO deleteProductFromOrder(int id, String productCode) throws OperationException {
@@ -281,33 +294,30 @@ public class OrderService {
         if (order == null) throw new OperationException(404, "Order not found");
         if (product == null) throw new OperationException(404, "Product not found");
 
+        OrderProduct orderProduct = order.getOrderProducts().stream()
+                .filter(op -> op.getId().getProductCode().equals(productCode))
+                .findFirst()
+                .orElse(null);
+
+        if (orderProduct == null) throw new OperationException(404, "Product not found in order");
+
         try {
-            // Check if an OrderProduct with the same product code already exists
-            OrderProduct orderProduct = order.getOrderProducts().stream()
-                    .filter(op -> op.getId().getProductCode().equals(productCode))
-                    .findFirst()
-                    .orElse(null);
+            // If it exists, delete the OrderProduct
+            order.getOrderProducts().remove(orderProduct);
 
-            if (orderProduct != null) {
-                // If it exists, delete the OrderProduct
-                order.getOrderProducts().remove(orderProduct);
+            // Calculate the total of the order after deleting the product
+            order.calculateTotal();
 
-                // Calculate the total of the order after deleting the product
-                order.calculateTotal();
+            // Save the updated order without the deleted product
+            orderRepository.save(order);
 
-                // Save the updated order without the deleted product
-                orderRepository.save(order);
-
-                // Delete the OrderProduct
-                orderProductRepository.delete(orderProduct);
-            } else {
-                throw new OperationException(404, "Product not found in order");
-            }
+            // Delete the OrderProduct from the database
+            orderProductRepository.delete(orderProduct);
 
             // Return the updated OrderDTO
             return new OrderDTO(order);
         } catch (Exception e) {
-            throw new OperationException(500, "Error deleting product from order");
+            throw new OperationException(500, "Error deleting product from order ".concat(e.getMessage()));
         }
     }
 }

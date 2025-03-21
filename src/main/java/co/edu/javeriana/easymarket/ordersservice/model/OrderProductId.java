@@ -1,9 +1,8 @@
 package co.edu.javeriana.easymarket.ordersservice.model;
 
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.Hibernate;
 
@@ -12,10 +11,9 @@ import java.util.Objects;
 
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 @Embeddable
 public class OrderProductId implements Serializable {
+    private static final long serialVersionUID = 1063722868607778360L;
     @Column(name = "id_order", nullable = false)
     private Integer idOrder;
 
@@ -34,5 +32,15 @@ public class OrderProductId implements Serializable {
     @Override
     public int hashCode() {
         return Objects.hash(idOrder, productCode);
+    }
+
+    // Constructor
+    public OrderProductId() {
+    }
+
+    // Constructor
+    public OrderProductId(Integer idOrder, String productCode) {
+        this.idOrder = idOrder;
+        this.productCode = productCode;
     }
 }

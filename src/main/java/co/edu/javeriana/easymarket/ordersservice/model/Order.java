@@ -2,7 +2,6 @@ package co.edu.javeriana.easymarket.ordersservice.model;
 
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderCreateDTO;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -15,11 +14,11 @@ import java.util.Set;
 @Setter
 @Entity
 @NoArgsConstructor
-@AllArgsConstructor
 @Table(name = "\"order\"")
 public class Order {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "order_id_gen")
+    @SequenceGenerator(name = "order_id_gen", sequenceName = "order_id_order_seq", allocationSize = 1)
     @Column(name = "id_order", nullable = false)
     private Integer id;
 
@@ -47,16 +46,16 @@ public class Order {
     @Column(name = "id_domiciliary", length = 36)
     private String idDomiciliary;
 
-    // One-to-Many relationships
-    @OneToMany(mappedBy = "idOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "idOrder")
     private Set<OrderProduct> orderProducts = new LinkedHashSet<>();
 
-    @OneToMany(mappedBy = "idOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "idOrder")
     private Set<OrderStatus> orderStatuses = new LinkedHashSet<>();
 
     // Create order from OrderCreateDTO
     public Order (OrderCreateDTO orderDTO){
         this.idUser = orderDTO.idUser();
+        this.address = orderDTO.address();
         this.creationDate = Instant.now();
         this.total = 0.0F;
         this.orderProducts = new LinkedHashSet<>();
@@ -68,6 +67,10 @@ public class Order {
         this.total = 0.0F;
         for (OrderProduct orderProduct : this.orderProducts) {
             this.total += orderProduct.getPrice();
+        }
+
+        if (this.shippingCost != null) {
+            this.total += this.shippingCost;
         }
     }
 }

@@ -11,6 +11,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @Table(name = "order_product")
 public class OrderProduct {
+    @SequenceGenerator(name = "order_product_id_gen", sequenceName = "order_id_order_seq", allocationSize = 1)
     @EmbeddedId
     private OrderProductId id;
 
@@ -25,14 +26,10 @@ public class OrderProduct {
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
-    @Column(name = "description", nullable = false, length = 100)
-    private String description;
-
-    public OrderProduct(Order order, Product product, Integer quantity){
+    public OrderProduct( Order order, Product product, int quantity) {
         this.id = new OrderProductId(order.getId(), product.getCode());
-        this.setIdOrder(order);
-        this.setQuantity(quantity);
-        this.setPrice(product.getPrice() * quantity);
-        this.setDescription(product.getName());
+        this.idOrder = order;
+        this.quantity = quantity;
+        this.price = product.getPrice() * quantity;
     }
 }
