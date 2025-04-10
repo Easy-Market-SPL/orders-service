@@ -6,6 +6,7 @@ import co.edu.javeriana.easymarket.ordersservice.model.OrderStatus;
 import lombok.*;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashMap;
 
@@ -24,6 +25,9 @@ public class OrderDTO implements Serializable {
     String transportCompany;
     String shippingGuide;
     String idDomiciliary;
+    BigDecimal lat;
+    BigDecimal lng;
+    Float debt;
     HashMap<String, Integer> products;
     HashMap<String, Instant> status;
 
@@ -38,6 +42,10 @@ public class OrderDTO implements Serializable {
         this.transportCompany = order.getTransportCompany();
         this.shippingGuide = order.getShippingGuide();
         this.idDomiciliary = order.getIdDomiciliary();
+        this.lat = order.getLat();
+        this.lng = order.getLng();
+        this.debt = order.getDebt();
+
         this.products = new HashMap<>();
         this.status = new HashMap<>();
 

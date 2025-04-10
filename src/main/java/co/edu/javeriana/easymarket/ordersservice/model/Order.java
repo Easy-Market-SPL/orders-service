@@ -2,10 +2,12 @@ package co.edu.javeriana.easymarket.ordersservice.model;
 
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderCreateDTO;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -14,6 +16,7 @@ import java.util.Set;
 @Setter
 @Entity
 @NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "\"order\"")
 public class Order {
     @Id
@@ -46,6 +49,15 @@ public class Order {
     @Column(name = "id_domiciliary", length = 36)
     private String idDomiciliary;
 
+    @Column(name = "debt")
+    private Float debt;
+
+    @Column(name = "lat", precision = 9, scale = 6)
+    private BigDecimal lat;
+
+    @Column(name = "lng", precision = 9, scale = 6)
+    private BigDecimal lng;
+
     @OneToMany(mappedBy = "idOrder")
     private Set<OrderProduct> orderProducts = new LinkedHashSet<>();
 
@@ -73,4 +85,5 @@ public class Order {
             this.total += this.shippingCost;
         }
     }
+
 }

@@ -3,35 +3,36 @@ package co.edu.javeriana.easymarket.ordersservice.services;
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderCreateDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderUpdateDTO;
+import co.edu.javeriana.easymarket.ordersservice.dtos.utils.OnWayDeliveryDTO;
+import co.edu.javeriana.easymarket.ordersservice.exceptions.business_exceptions.ResourceNotFoundException;
+import co.edu.javeriana.easymarket.ordersservice.exceptions.business_exceptions.UnauthorizedException;
+import co.edu.javeriana.easymarket.ordersservice.exceptions.error_messages.LogicErrorMessages;
 import co.edu.javeriana.easymarket.ordersservice.model.*;
-import co.edu.javeriana.easymarket.ordersservice.repository.OrderProductRepository;
-import co.edu.javeriana.easymarket.ordersservice.repository.OrderRepository;
-import co.edu.javeriana.easymarket.ordersservice.repository.OrderStatusRepository;
-import co.edu.javeriana.easymarket.ordersservice.repository.ProductRepository;
-import co.edu.javeriana.easymarket.ordersservice.utils.OperationException;
-import org.springframework.beans.factory.annotation.Autowired;
+import co.edu.javeriana.easymarket.ordersservice.repository.*;
+import co.edu.javeriana.easymarket.ordersservice.services.helpers.ValidationService;
+import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@AllArgsConstructor
 public class OrderService {
+
+    // Repositories
     private final OrderRepository orderRepository;
     private final OrderStatusRepository orderStatusRepository;
     private final OrderProductRepository orderProductRepository;
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    public OrderService (OrderRepository orderRepository, OrderStatusRepository orderStatusRepository, OrderProductRepository orderProductRepository, ProductRepository productRepository){
-        this.orderRepository = orderRepository;
-        this.orderStatusRepository = orderStatusRepository;
-        this.orderProductRepository = orderProductRepository;
-        this.productRepository = productRepository;
-    }
+    // Validation Service
+    private final ValidationService validatorService;
 
-    ///  Get all orders
+    /// GET ALL ORDERS
     public List<OrderDTO> getOrders(){
         return orderRepository.findAll()
                 .stream()
@@ -39,8 +40,17 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    ///  Get orders by user
-    public List<OrderDTO> getOrdersByUser(String idUser) throws OperationException {
+    /// CREATE AN ORDER
+    public OrderDTO createOrder(OrderCreateDTO orderDTO){
+        // Validate user
+        validatorService.validateExists(userRepository.findById(orderDTO.idUser()), LogicErrorMessages.OrderErrorMessages.getUserNotFoundMessage(orderDTO.idUser()));
+
+        Order order = new Order(orderDTO);
+        return new OrderDTO(orderRepository.save(order));
+    }
+
+    ///  GET ORDERS BY USER
+    public List<OrderDTO> getOrdersByUser(String idUser) {
         return orderRepository.findAll()
                 .stream()
                 .filter(order -> order.getIdUser().equals(idUser))
@@ -48,147 +58,118 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    ///  Get a specific order by id
-    public OrderDTO getOrderById(int id) throws OperationException {
-        Order order = orderRepository.findById(id).orElse(null);
-        if (order == null) throw new OperationException(404, "Order not found");
+    /// GET A SPECIFIC ORDER BY ID
+    public OrderDTO getOrderById(int id){
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
 
+        Order order = orderRepository.findById(id).orElseThrow();
         return new OrderDTO(order);
     }
 
-    ///  Create an order
-    public OrderDTO createOrder(OrderCreateDTO orderDTO) throws OperationException {
-        Order order = new Order(orderDTO);
-        // Save order in the database
-        try {
-            return new OrderDTO(orderRepository.save(order));
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Error creating order".concat(e.getMessage()));
-        }
-    }
 
-    ///  Update an order
-    public OrderDTO updateOrder(int id, OrderUpdateDTO orderDTO) throws OperationException {
-        Order order = orderRepository.findById(id).orElse(null);
-        if (order == null) throw new OperationException(404, "Order not found");
+    /// UPDATE AN ORDER (ONLY ADDRESS)
+    public OrderDTO updateOrder(int id, OrderUpdateDTO orderDTO) {
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+
+        Order order = orderRepository.findById(id).orElseThrow();
         order.setAddress(orderDTO.address());
+        return new OrderDTO(orderRepository.save(order));
 
-        // Save order in the database
-        try {
-            return new OrderDTO(orderRepository.save(order));
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Error updating order ".concat(e.getMessage()));
-        }
     }
 
-    ///  Status of the order
-    /// Confirm order
-    public OrderDTO confirmOrder(int id, Integer shippingCost) throws OperationException {
-        Order order = orderRepository.findById(id).orElse(null);
+    /// UPDATE STATUS OF ORDER
+    /// UPDATE STATUS OF ORDER TO CONFIRM
+    public OrderDTO confirmOrder(int id, Integer shippingCost, Float paymentAmount) throws UnauthorizedException {
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+        Order order = orderRepository.findById(id).orElseThrow();
 
-        if (order == null) throw new OperationException(404, "Order not found");
-
-        // Add confirmed status to the order and set shipping cost
-        try {
-            OrderStatusId orderStatusId = new OrderStatusId("confirmed", order.getId());
-            OrderStatus orderStatus = new OrderStatus(orderStatusId, order);
-            order.getOrderStatuses().add(orderStatus);
-
-            orderStatusRepository.save(orderStatus);
-
-            order.setShippingCost(shippingCost);
-            float total = (order.getTotal() + shippingCost);
-            order.setTotal(total);
-
-            return new OrderDTO(orderRepository.save(order));
-        } catch (Exception e) {
-            throw new OperationException(500, "Error updating status to Confirmed ".concat(e.getMessage()));
+        // CHECK IF THE STATUSES ARE EMPTY
+        if (!order.getOrderStatuses().isEmpty()) {
+            throw new UnauthorizedException(LogicErrorMessages.OrderErrorMessages.invalidConfirm());
         }
+
+        OrderStatusId orderStatusId = new OrderStatusId("confirmed", order.getId());
+        OrderStatus orderStatus = new OrderStatus(orderStatusId, order);
+        order.getOrderStatuses().add(orderStatus);
+
+        orderStatusRepository.save(orderStatus);
+
+        order.setShippingCost(shippingCost);
+        float total = (order.getTotal() + shippingCost);
+        order.setTotal(total);
+
+        order.setDebt(total - paymentAmount);
+
+        return new OrderDTO(orderRepository.save(order));
     }
 
-    /// Prepare order
-    public OrderDTO prepareOrder(int id) throws OperationException {
-        Order order = orderRepository.findById(id).orElse(null);
+    /// UPDATE STATUS TO PREPARING
+    public OrderDTO prepareOrder(int id) throws UnauthorizedException {
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+        Order order = orderRepository.findById(id).orElseThrow();
 
-        if (order == null) throw new OperationException(404, "Order not found");
+        // CHECK IF THE LAST STATUS IS CONFIRMED
+        if (order.getOrderStatuses().isEmpty() || order.getOrderStatuses().stream().noneMatch(orderStatus -> orderStatus.getId().getStatus().equals("confirmed"))) {
+            // Take the value of last status
+            String lastStatus = order.getOrderStatuses().stream()
+                    .map(OrderStatus::getId)
+                    .map(OrderStatusId::getStatus)
+                    .reduce((first, second) -> second)
+                    .orElse("none");
 
-        // Add prepared status to the order and set end date of the previous status
-        try{
-            // Add prepared status to the order and set end date of the previous status
-            OrderStatus orderStatus = new OrderStatus(new OrderStatusId("preparing", order.getId()), order);
-            order.getOrderStatuses().add(orderStatus);
-            orderStatusRepository.save(orderStatus);
-
-            order.getOrderStatuses().stream()
-                    .filter(previosOrderStatus -> previosOrderStatus.getId().getStatus().equals("confirmed"))
-                    .findFirst()
-                    .ifPresent(previosOrderStatus -> previosOrderStatus.setEndDate(orderStatus.getStartDate()));
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Wrong status");
+            throw new UnauthorizedException(LogicErrorMessages.OrderErrorMessages.errorChangeOrderStatus(String.valueOf(id), "preparing", lastStatus));
         }
 
-        // Save order in the database
-        try {
-            return new OrderDTO(orderRepository.save(order));
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Error updating status to preparing ".concat(e.getMessage()));
-        }
+        OrderStatus orderStatus = new OrderStatus(new OrderStatusId("preparing", order.getId()), order);
+        order.getOrderStatuses().add(orderStatus);
+        orderStatusRepository.save(orderStatus);
+
+        order.getOrderStatuses().stream()
+                .filter(previosOrderStatus -> previosOrderStatus.getId().getStatus().equals("confirmed"))
+                .findFirst()
+                .ifPresent(previosOrderStatus -> previosOrderStatus.setEndDate(orderStatus.getStartDate()));
+
+        return new OrderDTO(orderRepository.save(order));
+
     }
-    ///  On the way as domiciliary
-    public OrderDTO onTheWayDomiciliaryOrder(int id, String idDomiciliary) throws OperationException {
-        Order order = orderRepository.findById(id).orElse(null);
+    /// UPDATE STATUS TO ON THE WAY (DOMICILIARY)
+    public OrderDTO onTheWayDomiciliaryOrder(int id, OnWayDeliveryDTO delivery) {
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+        Order order = orderRepository.findById(id).orElseThrow();
 
-        if (order == null) throw new OperationException(404, "Order not found");
+        orderStatusOnTheWay(order);
+        order.setIdDomiciliary(delivery.idDomiciliary());
+        order.setLat(BigDecimal.valueOf(delivery.initialLatitude()));
+        order.setLng(BigDecimal.valueOf(delivery.initialLongitude()));
 
-        // Add delivered status to the order and set domiciliary and shipping guide
-        try{
-            orderStatusOnTheWay(order);
-            order.setIdDomiciliary(idDomiciliary);
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Wrong status");
-        }
+        return new OrderDTO(orderRepository.save(order));
 
-        // Save order in the database
-        try {
-            return new OrderDTO(orderRepository.save(order));
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Error updating status to On The Way ".concat(e.getMessage()));
-        }
     }
-    ///  On the way as transport company
-    public OrderDTO onTheWayTransportCompanyOrder(int id, String transportCompany, String shippingGuide) throws OperationException {
-        Order order = orderRepository.findById(id).orElse(null);
+    /// UPDATE STATUS TO ON THE WAY (TRANSPORT COMPANY)
+    public OrderDTO onTheWayTransportCompanyOrder(int id, String transportCompany, String shippingGuide) {
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+        Order order = orderRepository.findById(id).orElseThrow();
 
-        if (order == null) throw new OperationException(404, "Order not found");
+        orderStatusOnTheWay(order);
 
-        // Add delivered status to the order and set transport company and shipping guide
-        try{
-            orderStatusOnTheWay(order);
+        order.setTransportCompany(transportCompany);
+        order.setShippingGuide(shippingGuide);
 
-            order.setTransportCompany(transportCompany);
-            order.setShippingGuide(shippingGuide);
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Wrong status");
-        }
-
-        // Save order in the database
-        try {
-            return new OrderDTO(orderRepository.save(order));
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Error updating status to On The Way".concat(e.getMessage()));
-        }
+        return new OrderDTO(orderRepository.save(order));
     }
 
-    ///  Aux Method for avoid duplicated code for the OnTheWay status
+    ///  AUX METHOD FOR AVOID REPEATED CODE ON UPDATE STATUS TO ON THE WAY
     private void orderStatusOnTheWay(Order order) {
+        // CHECK IF THE LAST STATUS IS PREPARING
+        if (order.getOrderStatuses().isEmpty() || order.getOrderStatuses().stream().noneMatch(orderStatus -> orderStatus.getId().getStatus().equals("preparing"))) {
+            String lastStatus = order.getOrderStatuses().stream()
+                    .map(OrderStatus::getId)
+                    .map(OrderStatusId::getStatus)
+                    .reduce((first, second) -> second)
+                    .orElse("none");
+            throw new UnauthorizedException(LogicErrorMessages.OrderErrorMessages.errorChangeOrderStatus(String.valueOf(order.getId()), "on the way", lastStatus));
+        }
+
         OrderStatus orderStatus = new OrderStatus(new OrderStatusId("on the way", order.getId()), order);
         order.getOrderStatuses().add(orderStatus);
 
@@ -200,124 +181,103 @@ public class OrderService {
                 .ifPresent(previosOrderStatus -> previosOrderStatus.setEndDate(orderStatus.getStartDate()));
     }
 
-    /// Delivered order
-    public OrderDTO deliveredOrder(int id) throws OperationException {
-        Order order = orderRepository.findById(id).orElse(null);
+    /// UPDATE STATUS TO DELIVERED
+    public OrderDTO deliveredOrder(int id) throws UnauthorizedException {
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+        Order order = orderRepository.findById(id).orElseThrow();
 
-        if (order == null) throw new OperationException(404, "Order not found");
+        // CHECK IF THE LAST STATUS IS ON THE WAY
+        if (order.getOrderStatuses().isEmpty() || order.getOrderStatuses().stream().noneMatch(orderStatus -> orderStatus.getId().getStatus().equals("on the way"))) {
+            String lastStatus = order.getOrderStatuses().stream()
+                    .map(OrderStatus::getId)
+                    .map(OrderStatusId::getStatus)
+                    .reduce((first, second) -> second)
+                    .orElse("none");
+            throw new UnauthorizedException(LogicErrorMessages.OrderErrorMessages.errorChangeOrderStatus(String.valueOf(id), "delivered", lastStatus));
+        }
 
-        // Add delivered status to the order
-        try{
-            OrderStatus orderStatus =  new OrderStatus(new OrderStatusId("delivered", order.getId()), order);
-            order.getOrderStatuses().add(orderStatus);
+        OrderStatus orderStatus =  new OrderStatus(new OrderStatusId("delivered", order.getId()), order);
+        order.getOrderStatuses().add(orderStatus);
+        orderStatusRepository.save(orderStatus);
 
-            orderStatusRepository.save(orderStatus);
+        order.getOrderStatuses().stream()
+                .filter(previosOrderStatus -> previosOrderStatus.getId().getStatus().equals("on the way"))
+                .findFirst()
+                .ifPresent(previosOrderStatus -> previosOrderStatus.setEndDate(orderStatus.getStartDate()));
 
-            order.getOrderStatuses().stream()
-                    .filter(previosOrderStatus -> previosOrderStatus.getId().getStatus().equals("on the way"))
-                    .findFirst()
-                    .ifPresent(previosOrderStatus -> previosOrderStatus.setEndDate(orderStatus.getStartDate()));
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Wrong status");
-        }
-        // Save order in the database
-        try {
-            return new OrderDTO(orderRepository.save(order));
-        }
-        catch (Exception e){
-            throw new OperationException(500, "Error updating status to delivered ".concat(e.getMessage()));
-        }
+        return new OrderDTO(orderRepository.save(order));
     }
 
-    ///  Delete an order
-    public void deleteOrder(int id) throws OperationException {
-        Order order = orderRepository.findById(id).orElse(null);
-        if (order == null) throw new OperationException(404, "Order not found");
+    ///  DELETE AN ORDER
+    public void deleteOrder(int id) {
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+        Order order = orderRepository.findById(id).orElseThrow();
 
-        try {
-            // Delete OrderProduct and OrderStatus related to the order using the repository where the id is of the order
-            orderProductRepository.deleteAll(order.getOrderProducts());
-            orderStatusRepository.deleteAll(order.getOrderStatuses());
+        // Delete OrderProduct and OrderStatus related to the order using the repository where the id is of the order
+        orderProductRepository.deleteAll(order.getOrderProducts());
+        orderStatusRepository.deleteAll(order.getOrderStatuses());
 
-            orderRepository.delete(order);
-        } catch (Exception e) {
-            throw new OperationException(500, "Error deleting order ".concat(e.getMessage()));
-        }
+        orderRepository.delete(order);
     }
 
-    ///  Methods to update the products of an order
-    /// Add Product to Order
-    public OrderDTO addProductToOrder(int id, String productCode, int quantity) throws OperationException {
-        Order order = orderRepository.findById(id).orElse(null);
-        Product product = productRepository.findById(productCode).orElse(null);
+    ///  METHODS TO UPDATE THE ORDER PRODUCTS
+    /// ADD PRODUCT TO ORDER
+    public OrderDTO addProductToOrder(int id, String productCode, int quantity) {
+        // Validate exists product and order
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+        validatorService.validateExists(productRepository.findById(productCode), LogicErrorMessages.OrderErrorMessages.getProductNotFoundMessage(productCode));
 
-        if (order == null) throw new OperationException(404, "Order not found");
-        if (product == null) throw new OperationException(404, "Product not found");
+        Order order = orderRepository.findById(id).orElseThrow();
+        Product product = productRepository.findById(productCode).orElseThrow();
 
         if (order.getOrderProducts() == null) {
             order.setOrderProducts(new LinkedHashSet<>());
         }
 
-        try {
-            OrderProduct orderProduct = order.getOrderProducts().stream()
-                    .filter(op -> op.getId().getProductCode().equals(productCode))
-                    .findFirst()
-                    .orElse(null);
-
-            if (orderProduct != null) {
-                orderProduct.setQuantity(quantity);
-                orderProduct.setPrice(product.getPrice() * orderProduct.getQuantity());
-                orderProductRepository.save(orderProduct);
-            } else {
-                orderProduct = new OrderProduct(order, product, quantity);
-                order.getOrderProducts().add(orderProduct);
-                orderProductRepository.save(orderProduct);
-            }
-
-            order.calculateTotal();
-            orderRepository.save(order);
-
-            return new OrderDTO(order);
-        } catch (Exception e) {
-            throw new OperationException(500, "Error adding product to order ".concat(e.getMessage()));
-        }
-    }
-
-
-    ///  Delete product from order
-    public OrderDTO deleteProductFromOrder(int id, String productCode) throws OperationException {
-        // Find order and product by respective id
-        Order order = orderRepository.findById(id).orElse(null);
-        Product product = productRepository.findById(productCode).orElse(null);
-
-        if (order == null) throw new OperationException(404, "Order not found");
-        if (product == null) throw new OperationException(404, "Product not found");
 
         OrderProduct orderProduct = order.getOrderProducts().stream()
                 .filter(op -> op.getId().getProductCode().equals(productCode))
                 .findFirst()
                 .orElse(null);
 
-        if (orderProduct == null) throw new OperationException(404, "Product not found in order");
-
-        try {
-            // If it exists, delete the OrderProduct
-            order.getOrderProducts().remove(orderProduct);
-
-            // Calculate the total of the order after deleting the product
-            order.calculateTotal();
-
-            // Save the updated order without the deleted product
-            orderRepository.save(order);
-
-            // Delete the OrderProduct from the database
-            orderProductRepository.delete(orderProduct);
-
-            // Return the updated OrderDTO
-            return new OrderDTO(order);
-        } catch (Exception e) {
-            throw new OperationException(500, "Error deleting product from order ".concat(e.getMessage()));
+        if (orderProduct != null) {
+            orderProduct.setQuantity(quantity);
+            orderProduct.setPrice(product.getPrice() * orderProduct.getQuantity());
+            orderProductRepository.save(orderProduct);
+        } else {
+            orderProduct = new OrderProduct(order, product, quantity);
+            order.getOrderProducts().add(orderProduct);
+            orderProductRepository.save(orderProduct);
         }
+
+        order.calculateTotal();
+        orderRepository.save(order);
+
+        return new OrderDTO(order);
+    }
+
+
+    /// DELETE PRODUCT FROM ORDER
+    public OrderDTO deleteProductFromOrder(int id, String productCode) throws ResourceNotFoundException {
+        // Find order, product and order product by respective id
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+        validatorService.validateExists(productRepository.findById(productCode), LogicErrorMessages.OrderErrorMessages.getProductNotFoundMessage(productCode));
+
+        Order order = orderRepository.findById(id).orElseThrow();
+
+        OrderProduct orderProduct = order.getOrderProducts().stream()
+                .filter(op -> op.getId().getProductCode().equals(productCode))
+                .findFirst()
+                .orElse(null);
+
+        if (orderProduct == null) throw new ResourceNotFoundException(LogicErrorMessages.OrderErrorMessages.invalidProductInOrder(productCode, String.valueOf(id)));
+
+        order.getOrderProducts().remove(orderProduct);
+        order.calculateTotal();
+
+        orderProductRepository.delete(orderProduct);
+        orderRepository.save(order);
+
+        return new OrderDTO(order);
     }
 }
