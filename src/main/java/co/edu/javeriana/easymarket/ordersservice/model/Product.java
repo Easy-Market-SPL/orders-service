@@ -1,13 +1,16 @@
 package co.edu.javeriana.easymarket.ordersservice.model;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Getter
 @Setter
 @Entity
 @Table(name = "product")
+@NoArgsConstructor
 public class Product {
     @Id
     @SequenceGenerator(name = "product_id_gen", sequenceName = "order_id_order_seq", allocationSize = 1)

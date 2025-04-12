@@ -11,16 +11,16 @@ public class LogicErrorMessages {
         }
 
         ///  METHODS FOR TAKE ERROR MESSAGES
-        public static String getOrderNotFoundMessage(String reviewId) {
-            return String.format("Order with ID %s not found", reviewId);
+        public static String getOrderNotFoundMessage(String orderId) {
+            return String.format("Order with ID %s not found", orderId);
         }
 
-        public static String getProductNotFoundMessage(String reviewId) {
-            return String.format("Product with ID %s not found", reviewId);
+        public static String getProductNotFoundMessage(String productId) {
+            return String.format("Product with ID %s not found", productId);
         }
 
-        public static String getUserNotFoundMessage(String reviewId) {
-            return String.format("User with ID %s not found", reviewId);
+        public static String getUserNotFoundMessage(String userId) {
+            return String.format("User with ID %s not found", userId);
         }
 
         public static String errorChangeOrderStatus(String orderId, String wantedStatus, String status) {
