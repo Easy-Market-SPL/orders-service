@@ -5,6 +5,7 @@ import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderCreateDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderUpdateDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.utils.ConfirmOrderDTO;
+import co.edu.javeriana.easymarket.ordersservice.dtos.utils.CreditPaymentDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.utils.OnWayCompanyDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.utils.OnWayDeliveryDTO;
 import co.edu.javeriana.easymarket.ordersservice.services.OrderService;
@@ -93,6 +94,13 @@ public class OrdersController {
     @PutMapping("/{id}/delivered")
     public ResponseEntity<OrderDTO> deliveredOrder(@PathVariable int id) {
         OrderDTO order = orderService.deliveredOrder(id);
+        return ResponseEntity.ok(order);
+    }
+
+    /// UPDATE THE DEBT OF AN ORDER BECAUSE OF A PAYMENT
+    @PutMapping("/{id}/debt_payment")
+    public ResponseEntity<OrderDTO> updateDebtOrder(@PathVariable int id, @RequestBody CreditPaymentDTO payment) {
+        OrderDTO order = orderService.updateDebt(id, payment);
         return ResponseEntity.ok(order);
     }
 

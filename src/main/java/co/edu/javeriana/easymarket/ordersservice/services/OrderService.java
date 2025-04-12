@@ -3,6 +3,7 @@ package co.edu.javeriana.easymarket.ordersservice.services;
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderCreateDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.orders.OrderUpdateDTO;
+import co.edu.javeriana.easymarket.ordersservice.dtos.utils.CreditPaymentDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.utils.OnWayDeliveryDTO;
 import co.edu.javeriana.easymarket.ordersservice.exceptions.business_exceptions.ResourceNotFoundException;
 import co.edu.javeriana.easymarket.ordersservice.exceptions.business_exceptions.UnauthorizedException;
@@ -220,7 +221,24 @@ public class OrderService {
         orderRepository.delete(order);
     }
 
-    ///  METHODS TO UPDATE THE ORDER PRODUCTS
+    /// UPDATE DEBT OF AN ORDER
+    public OrderDTO updateDebt(int id, CreditPaymentDTO paymentDTO) throws UnauthorizedException{
+        validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
+        Order order = orderRepository.findById(id).orElseThrow();
+
+        // Validate payment amount is less than or equal to debt
+        if (paymentDTO.paymentAmount() > order.getDebt()) {
+            throw new UnauthorizedException(LogicErrorMessages.OrderErrorMessages.invalidCreditDebtPayment(String.valueOf(order.getDebt()), String.valueOf(paymentDTO.paymentAmount())));
+        }
+
+        // If the process is successful, update the debt
+        order.setDebt(order.getDebt() - paymentDTO.paymentAmount());
+
+        // Return the order with the updated debt
+        return new OrderDTO(orderRepository.save(order));
+    }
+
+    /// METHODS TO UPDATE THE ORDER PRODUCTS
     /// ADD PRODUCT TO ORDER
     public OrderDTO addProductToOrder(int id, String productCode, int quantity) {
         // Validate exists product and order
@@ -233,7 +251,6 @@ public class OrderService {
         if (order.getOrderProducts() == null) {
             order.setOrderProducts(new LinkedHashSet<>());
         }
-
 
         OrderProduct orderProduct = order.getOrderProducts().stream()
                 .filter(op -> op.getId().getProductCode().equals(productCode))

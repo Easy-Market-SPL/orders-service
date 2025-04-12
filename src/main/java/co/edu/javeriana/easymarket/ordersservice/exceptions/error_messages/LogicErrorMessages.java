@@ -50,5 +50,9 @@ public class LogicErrorMessages {
         public static String invalidPaymentAmount(String amount){
             return String.format("Invalid data provided. The payment amount %s cannot be less than 0", amount);
         }
+
+        public static String invalidCreditDebtPayment(String debt, String currentPayment){
+            return String.format("Invalid data provided. The payment amount %s cannot be less than the debt %s", currentPayment, debt);
+        }
     }
 }
