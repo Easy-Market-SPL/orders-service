@@ -9,7 +9,7 @@ public record ConfirmOrderDTO (Integer shippingCost , Float paymentAmount) {
             throw new UnauthorizedException(LogicErrorMessages.OrderErrorMessages.invalidNumericArgument(String.valueOf(shippingCost)));
         }
 
-        if (paymentAmount == null || paymentAmount <= 0) {
+        if (paymentAmount == null || paymentAmount < 0) {
             throw new UnauthorizedException(
                     LogicErrorMessages.OrderErrorMessages.invalidPaymentAmount(String.valueOf(paymentAmount))
             );
