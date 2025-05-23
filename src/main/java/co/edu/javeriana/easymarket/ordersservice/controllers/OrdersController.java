@@ -9,7 +9,6 @@ import co.edu.javeriana.easymarket.ordersservice.dtos.utils.CreditPaymentDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.utils.OnWayCompanyDTO;
 import co.edu.javeriana.easymarket.ordersservice.dtos.utils.OnWayDeliveryDTO;
 import co.edu.javeriana.easymarket.ordersservice.services.OrderService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +20,6 @@ import java.util.List;
 public class OrdersController {
     private final OrderService orderService;
 
-    @Autowired
     public OrdersController(OrderService orderService) {
         this.orderService = orderService;
     }
@@ -65,7 +63,7 @@ public class OrdersController {
     ///  UPDATE STATUS TO CONFIRMED
     @PutMapping("/{id}/confirm")
     public ResponseEntity<OrderDTO> confirmOrder(@PathVariable int id, @RequestBody ConfirmOrderDTO confirmOrderDTO) {
-        OrderDTO order = orderService.confirmOrder(id, confirmOrderDTO.shippingCost(), confirmOrderDTO.paymentAmount());
+        OrderDTO order = orderService.confirmOrder(id, confirmOrderDTO.shippingCost(), confirmOrderDTO.paymentAmount(), confirmOrderDTO.confirmationDate());
         return ResponseEntity.ok(order);
     }
 

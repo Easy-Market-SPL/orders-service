@@ -174,8 +174,9 @@ class OrderServiceTest {
 
         int shippingCost = 20;
         float paymentAmount = 10f;
+        var date = "2023-10-01";
 
-        OrderDTO dto = orderService.confirmOrder(order.getId(), shippingCost, paymentAmount);
+        OrderDTO dto = orderService.confirmOrder(order.getId(), shippingCost, paymentAmount, date);
 
         assertEquals(shippingCost, dto.getShippingCost());
 
@@ -194,7 +195,7 @@ class OrderServiceTest {
         when(orderRepository.findById(order.getId())).thenReturn(Optional.of(order));
 
         assertThrows(UnauthorizedException.class,
-                () -> orderService.confirmOrder(order.getId(), 20, 10f)
+                () -> orderService.confirmOrder(order.getId(), 20, 10f, "2023-10-01")
         );
     }
 

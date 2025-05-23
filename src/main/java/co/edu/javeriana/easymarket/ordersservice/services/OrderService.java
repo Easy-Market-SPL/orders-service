@@ -15,6 +15,7 @@ import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -80,7 +81,7 @@ public class OrderService {
 
     /// UPDATE STATUS OF ORDER
     /// UPDATE STATUS OF ORDER TO CONFIRM
-    public OrderDTO confirmOrder(int id, Integer shippingCost, Float paymentAmount) throws UnauthorizedException {
+    public OrderDTO confirmOrder(int id, Integer shippingCost, Float paymentAmount, String confirmationDateStr) throws UnauthorizedException {
         validatorService.validateExists(orderRepository.findById(id), LogicErrorMessages.OrderErrorMessages.getOrderNotFoundMessage(String.valueOf(id)));
         Order order = orderRepository.findById(id).orElseThrow();
 
@@ -88,6 +89,11 @@ public class OrderService {
         if (!order.getOrderStatuses().isEmpty()) {
             throw new UnauthorizedException(LogicErrorMessages.OrderErrorMessages.invalidConfirm());
         }
+
+        // Parse the confirmationDate from string to Instant
+        Instant confirmationDate = confirmationDateStr != null ? 
+            Instant.parse(confirmationDateStr) : 
+            Instant.now();
 
         OrderStatusId orderStatusId = new OrderStatusId("confirmed", order.getId());
         OrderStatus orderStatus = new OrderStatus(orderStatusId, order);
@@ -100,6 +106,7 @@ public class OrderService {
         order.setTotal(total);
 
         order.setDebt(total - paymentAmount);
+        order.setCreationDate(confirmationDate);
 
         return new OrderDTO(orderRepository.save(order));
     }
